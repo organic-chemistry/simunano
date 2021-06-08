@@ -26,12 +26,12 @@ If not set the simulation will create reads with single forks starting at 1kb an
 If set several forks will be present on the read. The density of origins being controlled
 by **--average_distance_between_ori** 50000, which set the average distance between origins in bp.
 
-**--n_conf control** the number of simulated set of origin
 
-**--time_per_mrt** control the number of simulated Brdu pulse per configuration (a pulse is charactarised by a starting
+ * **--resolution** control the sampling along the read (in bp) right now the noise model has only been calibrated at 100 bp resolution
+ * **--n_conf control** the number of simulated set of origin
+ * **--time_per_mrt** control the number of simulated Brdu pulse per configuration (a pulse is charactarised by a starting
 time drawed randomly between 0 and 3/5 of the maximum replication time)
-
-**--read_per_time** control the number of truncated fiber extracted per Brdu pulse. (Right now the distribution is log normal)
+ * **--read_per_time** control the number of truncated fiber extracted per Brdu pulse. (Right now the distribution is log normal)
 
 All the parameter of the pulse and fork can be secified  using:
 **--parameter_file** whose default is set to data/params.json . Right now all the fork on a fiber have the same parameters.
@@ -47,6 +47,8 @@ it creates by defaults three files, whose prefix can be set by **--prefix** (Rig
 Additionnaly it can output:
   * with **--ground_truth** a *_gt.fa* which contain the same information as the *.fa* file but without noise
   * with **--fork_position** a file which contain all the positions of the ascending part of the fork as well as their direction
+  * with **--draw_sample 20 ** it will create a pdf with 20 readn to inspect the outputs
+
 .. _pyscaffold-notes:
 
 Note
