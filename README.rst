@@ -29,12 +29,11 @@ by **--average_distance_between_ori** 50000, which set the average distance betw
 
  * **--resolution** control the sampling along the read (in bp) right now the noise model has only been calibrated at 100 bp resolution
  * **--n_conf control** the number of simulated set of origin
- * **--time_per_mrt** control the number of simulated Brdu pulse per configuration (a pulse is charactarised by a starting
-time drawed randomly between 0 and 3/5 of the maximum replication time)
+ * **--time_per_mrt** control the number of simulated Brdu pulse per configuration (a pulse is charactarised by a starting time drawed randomly between 0 and 3/5 of the maximum replication time)
  * **--read_per_time** control the number of truncated fiber extracted per Brdu pulse. (Right now the distribution is log normal)
 
 All the parameter of the pulse and fork can be secified  using:
-**--parameter_file** whose default is set to data/params.json . Right now all the fork on a fiber have the same parameters.
+ * **--parameter_file** whose default is set to data/params.json . Right now all the fork on a fiber have the same parameters.
 The distribution of the parameter can be uniform, fixed (Set to choices with only one choice), a choice between different value,
 or from a list comming from an experiment, or from a pomegranatee gaussian mixture. See data/params.json for an example.
 
