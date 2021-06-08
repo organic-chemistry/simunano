@@ -22,7 +22,8 @@ cd simunano
 
 Usage
 ===========
-```conda activate simunano
+```
+conda activate simunano
 python src/simunano/simu_forks.py --multi --n_conf 400 --time_per_mrt 2  --fork_position --resolution 100 --draw_sample 4
 ```
 
