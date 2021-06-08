@@ -1,7 +1,7 @@
 
 simuNano
 ========
-Small scripts to simulati a BrdU incorporation experiments (including noise).
+Small scripts to simulate a BrdU incorporation experiments (including noise).
 
 Description
 ===========
