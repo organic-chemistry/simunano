@@ -14,9 +14,11 @@ length can be adjusted, followed by a decreasing exponential
 
 Install
 ===========
+```
 conda create --name simunano --file environment.yml
 git clone git@github.com:organic-chemistry/simunano.git
 cd simunano
+```
 
 Usage
 ===========
