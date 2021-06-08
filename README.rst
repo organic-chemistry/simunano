@@ -1,7 +1,7 @@
 ========
 simuNano
 ========
-Small scripts to simulati a BrdU incorporation experiments.
+Small scripts to simulati a BrdU incorporation experiments (including noise).
 
 Description
 ===========
@@ -24,21 +24,29 @@ Two main modes are available switched by the parameter --multi .
 If not set the simulation will create reads with single forks starting at 1kb and going to
 50 kb.
 If set several forks will be present on the read. The density of origins being controlled
-by *--average_distance_between_ori* 50000, which set the average distance between origins in bp.
+by **--average_distance_between_ori** 50000, which set the average distance between origins in bp.
 
---n_conf control the number of simulated set of origin
+**--n_conf control** the number of simulated set of origin
 
--- time_per_mrt control the number of simulated Brdu pulse per configuration (a pulse is charactarised by a starting
+**--time_per_mrt** control the number of simulated Brdu pulse per configuration (a pulse is charactarised by a starting
 time drawed randomly between 0 and 3/5 of the maximum replication time)
 
---read_per_time control the number of truncated fiber extracted per Brdu pulse. (Right now the distribution is log normal)
+**--read_per_time** control the number of truncated fiber extracted per Brdu pulse. (Right now the distribution is log normal)
 
 All the parameter of the pulse and fork can be secified  using:
---parameter_file whose default is set to data/params.json . Right now all the fork on a fiber have the same parameters.
+**--parameter_file** whose default is set to data/params.json . Right now all the fork on a fiber have the same parameters.
 The distribution of the parameter can be uniform, fixed (Set to choices with only one choice), a choice between different value,
 or from a list comming from an experiment, or from a pomegranatee gaussian mixture. See data/params.json for an example.
 
 
+
+it creates by defaults three files, whose prefix can be set by **--prefix** (Right now you must create a directory)
+  * a *.fa* file which alternate unique id and the percent of Brdu incorporation along the reads
+  * a  *_paramters.txt* file which contain all the parameters of the forks
+  * a  *_all_speeds.txt* file which contain the speeds of all the forks on the reads
+Additionnaly it can output:
+  * with **--ground_truth** a *_gt.fa* which contain the same information as the *.fa* file but without noise
+  * with **--fork_position** a file which contain all the positions of the ascending part of the fork as well as their direction
 .. _pyscaffold-notes:
 
 Note
