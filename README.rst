@@ -24,7 +24,7 @@ Two main modes are available switched by the parameter --multi .
 If not set the simulation will create reads with single forks starting at 1kb and going to
 50 kb.
 If set several forks will be present on the read. The density of origins being controlled
-by --average_distance_between_ori 50000, which set the average distance between origins in bp.
+by *--average_distance_between_ori* 50000, which set the average distance between origins in bp.
 
 --n_conf control the number of simulated set of origin
 
