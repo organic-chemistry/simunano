@@ -8,6 +8,8 @@ def smooth(ser, sc):
 
 
 origin = namedtuple("origin",["pos","firing_time","L_fork_speed","R_fork_speed"])
+Pause = namedtuple("pause",["pos","duration"])
+
 
 def track(time,start_time=2,end_time=15,maxv=0.8,minv=0.1,inct=1,pulselen=4,dect=5):
     """
@@ -39,7 +41,7 @@ def track(time,start_time=2,end_time=15,maxv=0.8,minv=0.1,inct=1,pulselen=4,dect
 
     return result,len(initial),len(before)
 
-def intersection(p1,p2):
+def intersection(p1,p2,pause=[0,0]):
     """
     Given two converging forks and their firing time and speeds,
     compute the position of the intersection
@@ -49,6 +51,8 @@ def intersection(p1,p2):
     """
     x1,t1,R_fork_speed=p1.pos,p1.firing_time,p1.R_fork_speed
     x2,t2,L_fork_speed=p2.pos,p2.firing_time,p2.L_fork_speed
+    t1 += pause[0]
+    t2 += pause[1]
 
     assert(x2>x1)
 
@@ -117,7 +121,7 @@ def generate_rfd(pos_time,end=1000):
     rfd[x2:]=1
     return rfd
 
-def generate_track(pos_time,start_time=10,end=1000,params={},same_parameters=True):
+def generate_track(pos_time,start_time=10,end=1000,params={},same_parameters=True,pauses=[]):
     """
     Given a list of origin and firing times and fork speed
     and a start_time for the injection of Brdu return the incorporation
@@ -144,33 +148,132 @@ def generate_track(pos_time,start_time=10,end=1000,params={},same_parameters=Tru
         kw = generate_params(param_k)
 
 
+    if len(pauses) ==0:
+        pauses=[Pause(pos=None,duration=0)] * (len(pos_time)+1)
+    #CHeck that pauses are ordered
+    if len(pauses)>1:
+        for p1,p2 in zip(pauses[:-1],pauses[1:]):
+            if p1.pos != None and p2.pos != None:
+                assert(p1.pos<p2.pos)
+
+    #insert empty pauses and order pause. check only one pause between all ori
+    #print("Before",pauses)
+    #print(pauses)
+    if len(pauses) != (len(pos_time)+1):
+        f_pauses=[None]*(len(pos_time)+1)
+        p_ori_order=[ori.pos for ori in pos_time]
+        #print(p_ori_order)
+        startp=0
+        if pauses[0].pos<p_ori_order[0]:
+            f_pauses[0]=pauses[0]
+            startp=1
+
+        for pause in pauses[startp:]:
+            for ipos in range(len(p_ori_order)-1):
+                if p_ori_order[ipos+1]>pause.pos>=p_ori_order[ipos]:
+
+                    if f_pauses[ipos+1] != None:
+                        print("At least two pauses located between two origins")
+                        print("Origins",pos_ori)
+                        print("Pauses",pauses)
+                        raise
+                    else:
+                        f_pauses[ipos+1]=pause
+        if pauses[-1].pos>p_ori_order[-1]:
+            f_pauses[-1]=pauses[-1]
+        for i in range(len(f_pauses)):
+            if f_pauses[i] == None:
+                f_pauses[i]=Pause(pos=None,duration=0)
+        #print("After",f_pauses)
+        pauses=f_pauses
+    else:
+        #Pauses must be located between origins
+        for pause,ori in zip(pauses,pos_time):
+            if pause.pos != None:
+                assert(pause.pos<=ori.pos)
+        for pause,ori in zip(pauses[1:],pos_time[:]):
+            if pause.pos != None:
+                assert(pause.pos>=ori.pos)
+
+
+
+    assert(len(pauses)==len(pos_time)+1)
+
+    #def generate_time(start_t,pos_end,speed,pause=0):
+    #    return np.arange(start_t,start_t+pos_end/speed,1/speed)
+
 
     trac = np.zeros(end)
+
     x1,t1,L_fork_speed = pos_time[0].pos,pos_time[0].firing_time,pos_time[0].L_fork_speed
     time= np.arange(t1,t1+x1/L_fork_speed,1/L_fork_speed)
+    if pauses[0].duration != 0:
+        #print(pauses)
+        time[x1-pauses[0].pos:]+=pauses[0].duration
 
-    t,len_init,before = track(time,start_time=start_time,end_time=t1+x1/L_fork_speed,
+    t,len_init,before = track(time,start_time=start_time,end_time=t1+x1/L_fork_speed+pauses[0].duration,
                                **generate_params(param_k,kw))
     trac[:x1] = t[:x1][::-1]
 
     #print(len_init)
+    mrt = [time[:x1][::-1]]
+    #mrt[:x1] = time[:x1][::-1]
     len_initial = [len_init + 0] #store the length of the increasing parts
     pos_s = [[x1-len_init-before,x1-before]]
-    for p1,p2 in zip(pos_time[:-1],pos_time[1:]):
+    for interval,(p1,p2,pause) in enumerate(zip(pos_time[:-1],pos_time[1:],pauses[1:]),1):
+        if pause.duration !=0:
+            assert(p2.pos>pause.pos>p1.pos)
         possible,inte = intersection(p1,p2)
         middle = int(round(inte[0]))
+        first_encounter_pause=True
+        if pause.duration!=0:
+            if middle > pause.pos:
+                #First fork get their first
+                delta=middle-pause.pos
+                delta_t=delta/p2.L_fork_speed
+                if delta_t>pause.duration:
+                    #Then fork1 finish its pause
+                    #Equivalent to starting late of time pause
+                    possible,inte = intersection(p1,p2,pause=[pause.duration,0])
+                    middle = int(round(inte[0]))
+                else:
+                    pauses[interval] = Pause(pos=pause.pos,duration=delta/p2.L_fork_speed)
+                    pause=pauses[interval]
+                    middle = pause.pos
+            else:
+                first_encounter_pause = False
+                delta=pause.pos-middle
+                delta_t=delta/p1.L_fork_speed
+                if delta_t >pause.duration:
+                    #Then fork2 finish its pause
+                    possible,inte = intersection(p1,p2,pause=[0,pause.duration])
+                    middle = int(round(inte[0]))
+                else:
+                    pauses[interval] = Pause(pos=pause.pos,duration=delta/p1.L_fork_speed)
+                    pause=pauses[interval]
+
+                    middle = pause.pos
 
 
         size = len(trac[p1[0]:middle])
         starto = p1.firing_time
         R_fork_speed = p1.R_fork_speed
+
+
         time= np.arange(starto,starto+size/R_fork_speed,1/R_fork_speed)
+        end_cover=0
+        if pause.duration != 0:
+            end_cover=pause.duration
+        if first_encounter_pause and pause.duration !=0:
+            time[pause.pos-p1.pos:] += pause.duration
+
+        mrt.append(time[:size])
         #print(time)
         #print(time,len(time))
         #print(p1[0],p2[0],middle)
         #print(track(time,start_time=start_time,end_time=starto+size/v)[:size])
-        trac[p1.pos:middle]
-        t,len_init,before= track(time,start_time=start_time,end_time=starto+size/R_fork_speed,
+        #trac[p1.pos:middle]
+        t,len_init,before= track(time,start_time=start_time,end_time=starto+size/R_fork_speed+end_cover,
                                    **generate_params(param_k,kw))
         trac[p1.pos:middle] = t[:size]
         len_initial.append(len_init + 0)
@@ -179,11 +282,17 @@ def generate_track(pos_time,start_time=10,end=1000,params={},same_parameters=Tru
         size = len(trac[middle:p2.pos])
         starto = p2.firing_time
         L_fork_speed = p2.L_fork_speed
+
         time= np.arange(starto,starto+size/L_fork_speed,1/L_fork_speed)
+        if not first_encounter_pause and pause.duration !=0:
+            time[p2.pos-pause.pos:] += pause.duration
+
+
+        mrt.append(time[:size][::-1])
         #print(time,len(time))
         trac[middle:p2.pos]
 
-        t,len_init,before = track(time,start_time=start_time,end_time=starto+size/L_fork_speed,
+        t,len_init,before = track(time,start_time=start_time,end_time=starto+size/L_fork_speed+end_cover,
                                    **generate_params(param_k,kw))
         trac[middle:p2.pos] = t[:size][::-1]
         len_initial.append(len_init + 0)
@@ -199,8 +308,15 @@ def generate_track(pos_time,start_time=10,end=1000,params={},same_parameters=Tru
     size = len(trac[x2:])
     time= np.arange(t2,t2+size/R_fork_speed,1/R_fork_speed)
 
+    if pauses[-1].duration != 0:
+            #print(pauses)
+        time[pauses[-1].pos-x2:]+=pauses[-1].duration
 
-    t,len_init,before = track(time,start_time=start_time,end_time=t2+size/R_fork_speed,
+    mrt.append(time[:size])
+    #mrt[x2:] = time[:size]
+
+
+    t,len_init,before = track(time,start_time=start_time,end_time=t2+size/R_fork_speed+pauses[-1].duration,
                                **generate_params(param_k,kw))
     trac[x2:] = t[:size]
     len_initial.append(len_init + 0)
@@ -208,7 +324,9 @@ def generate_track(pos_time,start_time=10,end=1000,params={},same_parameters=Tru
 
     if not same_parameters:
         kw = list_param_generated
-    return trac,[len_initial,pos_s],kw
+    #print(len(trac),len(np.concatenate(mrt)))
+    #print(pauses,R_fork_speed)
+    return trac,[len_initial,pos_s],kw,mrt
 
 
 def create_possible_origins(n_ori,n_sim,average_fork_speed,chlen,scaling=15):
@@ -238,6 +356,7 @@ if __name__ == "__main__":
     from scipy import stats
     import pandas as pd
     import pylab
+    import ast
     np.random.seed(0)
 
     import argparse
@@ -264,6 +383,13 @@ if __name__ == "__main__":
                                      "is set to False")
 
     parser.add_argument('--draw_sample',  type=int,default=0)
+    parser.add_argument('--conf',type=str,default=None,help="configuration of origins to simulate from")
+
+    parser.add_argument('--test',  action="store_true")
+    parser.add_argument('--whole_length',  action="store_true")
+    parser.add_argument('--length',  type=int,default=None)
+
+
 
     args = parser.parse_args()
 
@@ -298,6 +424,15 @@ if __name__ == "__main__":
         chlen = 50000 // resolution
         whole_length=True
 
+    if args.test:
+        chlen=50000 //resolution
+        whole_length=True
+
+    if args.whole_length:
+        whole_length=True
+    if args.length != None:
+        chlen=int(args.length/resolution)
+
     possiblesize = np.arange(5000//resolution,chlen)
     distribsize = stats.lognorm(0.5,scale=35000/resolution).pdf(possiblesize)
     distribsize /= np.sum(distribsize)
@@ -306,6 +441,8 @@ if __name__ == "__main__":
     pos={}
     fiber = {}
     rfd = {}
+    mrts = {}
+
     gt = {}
     parameters = {}
     all_speeds={}
@@ -328,16 +465,69 @@ if __name__ == "__main__":
                 shift= law["shift"]
             return law["data"][which]+shift
 
-    for sim_number  in range(args.n_conf_ori): # [current]:
+
+    if args.conf != None:
+        Confs = []
+        Pauses = []
+        with open(args.conf,"r") as f:
+            for line  in f.readlines():
+                new_conf = ast.literal_eval(line)
+                average_fork_speed = draw(params["speed"]) / resolution
+                ori_pos =[]
+                for ori in new_conf[0]:
+                    if len(ori)==4:
+                        ori[0] = int(ori[0]/resolution)
+                        ori_pos.append(origin(*ori))
+                    elif len(ori)==2:
+                        ori[0] /=resolution
+                        ori_pos.append(origin(int(ori[0]),ori[1],average_fork_speed,average_fork_speed))
+                    else:
+                        raise
+                Confs.append(ori_pos)
+
+                if len(new_conf)==2:
+                    pt = []
+                    for p in new_conf[1]:
+                        p[0]/=resolution
+                        pt.append(Pause(int(p[0]),p[1]))
+                    Pauses.append(pt)
+        n_conf=len(Confs)
+        #print(Confs)
+        #print(Pauses)
+
+    else:
+        n_conf = args.n_conf_ori
+
+    for sim_number  in range(n_conf): # [current]:
 
         average_fork_speed = draw(params["speed"]) / resolution
 
         if average_fork_speed<=0:
             continue
-
+        pauses=[]
         if not args.one_fork:
-            sim = create_possible_origins(int(chlen / (args.average_distance_between_ori / resolution)),1,
-                                  average_fork_speed,chlen)[0]
+
+            if args.test:
+                sim=[origin(100,0,average_fork_speed,average_fork_speed)]
+                #pauses=[Pause(pos=49,duration=20),Pause(pos=120,duration=4)]
+
+                sim=[origin(30,0,average_fork_speed,average_fork_speed),origin(150,0,average_fork_speed,average_fork_speed)]
+                pauses=[]
+                #pauses=[Pause(pos=140,duration=10)]
+                #pauses=[Pause(pos=0,duration=0),Pause(pos=140,duration=10),Pause(pos=180,duration=0)]
+                #pauses=[Pause(pos=140,duration=10)]
+                #pauses=[Pause(pos=0,duration=0),Pause(pos=120,duration=0.5),Pause(pos=180,duration=0)]
+                #pauses=[Pause(pos=0,duration=0),Pause(pos=80,duration=10),Pause(pos=180,duration=0)]
+                #pauses=[Pause(pos=0,duration=0),Pause(pos=80,duration=0.5),Pause(pos=180,duration=0)]
+
+
+            elif args.conf != None:
+                sim=Confs[sim_number]
+                pauses=Pauses[sim_number]
+                average_fork_speed = np.mean(np.concatenate([[ori.L_fork_speed,ori.R_fork_speed] for ori in ori_pos]))
+            else:
+                sim = create_possible_origins(int(chlen / (args.average_distance_between_ori / resolution)),1,
+                                      average_fork_speed,chlen)[0]
             mrt = generate_mrt(sim,end=chlen)
         # Draw time between the first 3/5 of the MRT
             minn = min(mrt)
@@ -359,8 +549,8 @@ if __name__ == "__main__":
                 kw["maxv"] = kw["maxv"]/(1-np.exp(-2/kw["inct"]))
 
             if not args.one_fork:
-                tc,len_initial,kw = generate_track(sim,start_time=i,
-                                                   end=chlen,params=kw)
+                tc,len_initial,kw,mrt = generate_track(sim,start_time=i,
+                                                   end=chlen,params=kw,pauses=pauses)
 
                 rfds = generate_rfd(sim,end=chlen)
             else:
@@ -371,20 +561,20 @@ if __name__ == "__main__":
                                     end_time=chlen/average_fork_speed,**kw)
                 rfds=None
                 kw["speed"]=len_init  / kw["pulselen"] * resolution
-
+                mrt=time
             for size in np.random.choice(possiblesize,p=distribsize,size=args.read_per_time):
 
                 start = np.random.randint(0,len(tc)-size)
                 if whole_length:
                     start=0
-                    size = len(tc)-1
-
-                attemp=0
-                while (rfds is not None and np.sum(rfds[start:start+size]) == 0) or  ((np.max(tc[start:start+size]) - np.min(tc[start:start+size])) < 0.3) :
-                    start = np.random.randint(0,len(tc)-size)
-                    attemp += 1
-                    if attemp > 100:
-                        break
+                    size = len(tc)
+                else:
+                    attemp=0
+                    while (rfds is not None and np.sum(rfds[start:start+size]) == 0) or  ((np.max(tc[start:start+size]) - np.min(tc[start:start+size])) < 0.3) :
+                        start = np.random.randint(0,len(tc)-size)
+                        attemp += 1
+                        if attemp > 100:
+                            break
 
                 if not args.one_fork:
                     # Get speeds of non nul forks
@@ -413,6 +603,7 @@ if __name__ == "__main__":
                 kw["speed_th"] = average_fork_speed * resolution
                 parameters[ui] = kw
                 pos[ui] = np.arange(start,start+size)
+                mrts[ui]=mrt
 
                 if args.one_fork:
                     positions[ui]=[1000//resolution,1000//resolution+len_init,1]
@@ -427,8 +618,11 @@ if __name__ == "__main__":
 
     k = list(fiber.keys())
     print(len(fiber.keys()),"len")
-    kp = np.random.permutation(len(k))
-    permuted = np.array(k)[kp]
+    if args.conf !=None:
+        permuted = np.array(k)
+    else:
+        kp = np.random.permutation(len(k))
+        permuted = np.array(k)[kp]
 
 
     if args.ground_truth:
@@ -454,17 +648,26 @@ if __name__ == "__main__":
             j.writelines(f"{p}\n {' '.join(formated)}\n")
 
     if args.draw_sample != 0:
-        n=20
-        f = pylab.figure(figsize=(20,20))
-        k = list(fiber.keys())
-        kp = np.random.permutation(len(k))
+
+        maxi = min(args.draw_sample,len(k))
+        f = pylab.figure(figsize=(20,maxi))
         #k1 = list(speed.keys())
         #print(k[:10],k1[:10])
-        for i in range(args.draw_sample-1):
-            f.add_subplot(n//2,2,i+1)
-            ui = np.array(k)[kp][i]
+        for i in range(maxi):
+            f.add_subplot(maxi//2,2,i+1)
+            ui = np.array(permuted)[i]
             ftp  = fiber[ui]
-            pylab.plot(np.arange(len(ftp))/10,ftp,label=parameters[ui]["maxv"])
+            #print(len(mrts[ui]))
+            if len(mrts[ui])>1:
+                mrt=np.concatenate(mrts[ui])
+            else:
+                mrt=mrts[ui].flatten()
+
+            pylab.plot(np.arange(len(ftp))*resolution/1000,ftp,label=parameters[ui]["maxv"])
+            #pylab.plot(np.arange(len(ftp))/10,gt[ui],label=parameters[ui]["maxv"])
+
+            pylab.plot(np.arange(len(mrt))*resolution/1000,mrt/max(mrt),label=parameters[ui]["maxv"])
+
             #plot(np.arange(len(ftp))/10,rfd[np.array(k)[kp][i]])
             pylab.ylim(0,1.1)
             #xlim(0,50)
