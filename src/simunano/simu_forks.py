@@ -334,16 +334,19 @@ def create_possible_origins(n_ori,n_sim,average_fork_speed,chlen,scaling=15):
     generate a list of possible simulation given a number of origin an average_fork_speed
     """
     sims =[]
+    #print(chlen,n_ori,chlen/n_ori/scaling,scaling)
     while len(sims) != n_sim:
-
+        #print(len(sims))
         pos = np.random.randint(0,chlen,n_ori)
         times = np.random.randint(0,chlen/n_ori/scaling,n_ori)
+        #times=np.ones_like(times)
         times -= min(times)
         pos.sort()
         if len(set(pos)) != len(pos):
             continue
         #print(pos)
         sim = [origin(p,t,average_fork_speed,average_fork_speed) for p,t in zip(pos,times)]
+        #print(sim)
         if type(generate_mrt(sim)) != bool:
             sims.append(sim)
     return sims
@@ -357,7 +360,6 @@ if __name__ == "__main__":
     import pandas as pd
     import pylab
     import ast
-    np.random.seed(0)
 
     import argparse
     parser = argparse.ArgumentParser()
@@ -388,10 +390,16 @@ if __name__ == "__main__":
     parser.add_argument('--test',  action="store_true")
     parser.add_argument('--whole_length',  action="store_true")
     parser.add_argument('--length',  type=int,default=None)
-
+    parser.add_argument('--bckg',  type=str,default="repnano",choices=["repnano","meg3","meg3_res1"])
+    parser.add_argument('--no_mrt', dest="mrt",action="store_false")
+    parser.add_argument('--seed',  type=int,default=None)
+    parser.add_argument('--correlation',action="store_true")
 
 
     args = parser.parse_args()
+
+    if args.seed != None:
+        np.random.seed(args.seed)
 
 
     ##############################################
@@ -399,7 +407,6 @@ if __name__ == "__main__":
     with open(args.parameter_file,"r") as f:
         params = json.load(f)
     # maxv: lowest highest value of the plateau when increasing
-
     # minv:[0.12-0.05,0.15-0.05], #l owest highest value of the plateau when decreasing
 
     # pulselen":[2,2], # smallest longest value of the pulse length in minute
@@ -407,6 +414,7 @@ if __name__ == "__main__":
     # dect : [2.,5]
 
     #############################################
+
     #Either create ori at specific position and firing time
     average_fork_speed=15 # in 100 bp/min
     Sim = [[origin(50,2,average_fork_speed,average_fork_speed),
@@ -442,6 +450,9 @@ if __name__ == "__main__":
     fiber = {}
     rfd = {}
     mrts = {}
+    starts={}
+    ends={}
+    deltas=[]
 
     gt = {}
     parameters = {}
@@ -464,6 +475,12 @@ if __name__ == "__main__":
             if "shift" in law:
                 shift= law["shift"]
             return law["data"][which]+shift
+
+    if args.correlation:
+        import pickle
+        fich=params["correlated"]["file"]
+        with open(fich,"rb") as f:
+            correlated_sample=pickle.load(f)
 
 
     if args.conf != None:
@@ -499,6 +516,8 @@ if __name__ == "__main__":
         n_conf = args.n_conf_ori
 
     for sim_number  in range(n_conf): # [current]:
+        if sim_number % 500 == 0:
+            print(sim_number,sim_number/n_conf)
 
         average_fork_speed = draw(params["speed"]) / resolution
 
@@ -527,7 +546,14 @@ if __name__ == "__main__":
                 average_fork_speed = np.mean(np.concatenate([[ori.L_fork_speed,ori.R_fork_speed] for ori in ori_pos]))
             else:
                 sim = create_possible_origins(int(chlen / (args.average_distance_between_ori / resolution)),1,
-                                      average_fork_speed,chlen)[0]
+                                      average_fork_speed,chlen,scaling=15*100/args.resolution)[0]
+
+                if len(sim)>1:
+                    #print(sim)
+                    deltas.extend([ori2.pos-ori1.pos for ori1,ori2 in zip(sim[:-1],sim[1:])])
+                else:
+                    deltas.append(np.nan)
+
             mrt = generate_mrt(sim,end=chlen)
         # Draw time between the first 3/5 of the MRT
             minn = min(mrt)
@@ -541,8 +567,14 @@ if __name__ == "__main__":
 
             param_k = ["maxv","minv","pulselen","inct","dect"]
 
-            for p in param_k:
-                kw[p] = draw(params[p])
+            if args.correlation:
+                kw["pulselen"] = draw(params["pulselen"])
+                correlated_sample_val = correlated_sample[np.random.randint(len(correlated_sample))]
+                for ite_param,val in enumerate(params["correlated"]["params"]):
+                    kw[val]=correlated_sample_val[ite_param]
+            else:
+                for p in param_k:
+                    kw[p] = draw(params[p])
 
             if args.correct_for_height:
 
@@ -557,11 +589,13 @@ if __name__ == "__main__":
 
                 time= np.arange(0,chlen/average_fork_speed,1/average_fork_speed)
                 #start at 1kb
-                tc,len_init,_ = track(time,start_time=time[1000//resolution-1],
+                start_mono=10000
+                tc,len_init,_ = track(time,start_time=time[start_mono//resolution-1],
                                     end_time=chlen/average_fork_speed,**kw)
                 rfds=None
                 kw["speed"]=len_init  / kw["pulselen"] * resolution
                 mrt=time
+            #print(kw)
             for size in np.random.choice(possiblesize,p=distribsize,size=args.read_per_time):
 
                 start = np.random.randint(0,len(tc)-size)
@@ -584,32 +618,84 @@ if __name__ == "__main__":
                                   if (li != 0) and startf>start and endf<start+size ]
 
                 ui = str(uuid.uuid4())
-                gt[ui] = tc[start:start+size]
+                if args.ground_truth:
+                    gt[ui] = np.array(tc[start:start+size],dtype=np.float16)
                 f = tc[start:start+size].copy()
 
-                val_background =  stats.lognorm.rvs(s=1,scale=0.017*1.48,loc=0.015, size=1)[0]
-                while val_background>0.2:
+                if args.bckg == "repnano":
                     val_background =  stats.lognorm.rvs(s=1,scale=0.017*1.48,loc=0.015, size=1)[0]
+                    while val_background>0.2:
+                        val_background =  stats.lognorm.rvs(s=1,scale=0.017*1.48,loc=0.015, size=1)[0]
 
-                f+=val_background
-                f[f>1]=1
-                kw["val_background"]=val_background
+                    f+=val_background
+                    f[f>1]=1
+                    kw["val_background"]=val_background
 
-                n_info = np.random.randint(15,60)
-                f= np.random.binomial(n_info,f) / n_info
-                f = smooth(f,2)
+                    n_info = np.random.randint(15,60)
+                    f= np.random.binomial(n_info,f) / n_info
+                    f = smooth(f,2)
+                elif args.bckg == "meg3":
+                    lgparam=[1.978551381625039, -4.0862276995991705e-06, 0.001]
+                    val_background =  stats.lognorm.rvs(*lgparam, size=1)[0]
+                    while val_background>0.2 or val_background<1e-7:
+                        val_background =  stats.lognorm.rvs(*lgparam, size=1)[0]
+                    #print(val_background)
+                    f+=val_background
+                    f[f>1]=1
+                    kw["val_background"]=val_background
+
+                    n_info = np.random.randint(10,60,len(f))
+                    f= np.random.binomial(n_info,f) / n_info
+
+                elif args.bckg == "meg3_res1":
+                    lgparam=[1.978551381625039, -4.0862276995991705e-06, 0.001]
+                    val_background =  stats.lognorm.rvs(*lgparam, size=1)[0]
+                    while val_background>0.2 or val_background<1e-7:
+                        val_background =  stats.lognorm.rvs(*lgparam, size=1)[0]
+                    #print(val_background)
+                    #gaussn = np.random.normal(0,scale=0.8,size=len(f))
+                    #f[f!=0]+=gaussn[f!=0]
+                    f[f<0]=0
+                    f+=val_background
+
+                    f[f>1]=1
+                    kw["val_background"]=val_background
+                    #n_info = np.random.randint(10,60,len(f))
+                    #f= np.array(np.random.binomial(1,f),dtype=np.int16)
+                    n_info = np.random.randint(1,3,len(f))
+                    f= np.random.binomial(n_info,f) / n_info
+
+
+                    nan=np.random.randint(0,len(f),size=int(1.5*len(f)))
+                    #print(f[9500:10500])
+                    #print(nan)
+                    #print(len(nan))
+
+                    #f = np.array(f,dtype=bool)
+                    f[nan]=-1
+                    #f=np.array(f,flo)
+                    #print(np.sum(np.isnan(f))/len(f),len(f),np.sum(np.isnan(f)))
+                        #f = smooth(f,2)
+
+                else:
+                    print(f"bacground {args.bckg} not implemented")
+                    raise
+
 
                 fiber[ui] = f
                 kw["speed_th"] = average_fork_speed * resolution
                 parameters[ui] = kw
-                pos[ui] = np.arange(start,start+size)
-                mrts[ui]=mrt
+                starts[ui]=starts
+                ends[ui]=ends
+                #pos[ui] = np.arange(start,start+size)
+                if args.mrt:
+                    mrts[ui]=np.array(np.concatenate(mrt),dtype=np.float16)
 
                 if args.one_fork:
-                    positions[ui]=[1000//resolution,1000//resolution+len_init,1]
-                    all_speeds[ui]=[kw.pop("speed")]
+                    positions[ui]=[start_mono//resolution,start_mono//resolution+len_init,1]
+                    all_speeds[ui]=[kw["speed"]]
                 else:
-                    all_speeds[ui]=kw.pop("speed")
+                    all_speeds[ui]=kw["speed"]
                     positions[ui]=[[startf-start,endf-start,(-1)**(posn+1)] for posn,(li,[startf,endf]) in enumerate(zip(len_initial[0],
                                                                len_initial[1])) \
                                   if (li != 0) and startf>start and endf<start+size ]
@@ -624,7 +710,8 @@ if __name__ == "__main__":
         kp = np.random.permutation(len(k))
         permuted = np.array(k)[kp]
 
-
+    if deltas != []:
+        print(f"Average distance {np.nanmean(deltas)}, fraction of mono ori {np.mean(np.isnan(deltas))}")
     if args.ground_truth:
         with open(f"{args.prefix}_gt.fa","w") as h:
             for p in permuted:
@@ -642,10 +729,15 @@ if __name__ == "__main__":
          open(f"{args.prefix}_all_speeds.txt","w") as j:
         for p in permuted:
             g.writelines(f"{p} {str(parameters[p])}\n")
-            formated = ["%.2f"%v for v in fiber[p]]
+            if args.resolution != 1:
+                formated = ["%.2f"%v for v in fiber[p]]
+            else:
+                formated = ["%.2f"%v if v != -1 else "%.2f"%np.nan  for v in fiber[p]]
             f.writelines(f"{p}\n {' '.join(formated)}\n")
             formated = ["%.2f"%v for v in all_speeds[p]]
             j.writelines(f"{p}\n {' '.join(formated)}\n")
+
+
 
     if args.draw_sample != 0:
 
@@ -657,16 +749,24 @@ if __name__ == "__main__":
             f.add_subplot(maxi//2,2,i+1)
             ui = np.array(permuted)[i]
             ftp  = fiber[ui]
+            if args.resolution == 1:
+                ftp =np.array(ftp,dtype=float)
+                ftp[ftp==-1]=np.nan
             #print(len(mrts[ui]))
-            if len(mrts[ui])>1:
-                mrt=np.concatenate(mrts[ui])
-            else:
-                mrt=mrts[ui].flatten()
+            #print(mrts[ui],type(mrts[ui]))
+            if ui in mrts:
+                if len(mrts[ui])>1 and (type(mrts[ui]) ==list):
+                    mrt=np.concatenate(mrts[ui])
+                else:
+                    mrt=mrts[ui].flatten()
 
-            pylab.plot(np.arange(len(ftp))*resolution/1000,ftp,label=parameters[ui]["maxv"])
+            pylab.plot(np.arange(len(ftp))*resolution/1000,ftp,"-o",label=parameters[ui]["maxv"])
+            if args.resolution == 1:
+                pylab.plot(np.arange(len(ftp))*resolution/1000,smooth(smooth(ftp,100),2500),label=parameters[ui]["maxv"])
+
             #pylab.plot(np.arange(len(ftp))/10,gt[ui],label=parameters[ui]["maxv"])
-
-            pylab.plot(np.arange(len(mrt))*resolution/1000,mrt/max(mrt),label=parameters[ui]["maxv"])
+            if not args.resolution==1 and ui in mrt:
+                pylab.plot(np.arange(len(mrt))*resolution/1000,mrt/max(mrt),label=parameters[ui]["maxv"])
 
             #plot(np.arange(len(ftp))/10,rfd[np.array(k)[kp][i]])
             pylab.ylim(0,1.1)

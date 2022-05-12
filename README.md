@@ -55,6 +55,14 @@ Additionnaly it can output:
   * with **--fork_position** a file which contain all the positions of the ascending part of the fork as well as their direction
   * with **--draw_sample 20 ** it will create a pdf with 20 readn to inspect the outputs
 
+
+it is also possible to run specific configuration specified in a file (se example ifli in example/conf.txt)
+```
+python src/simunano/simu_forks.py --conf ./example/conf.txt --multi --time_per_mrt 2 --read_per_time 1 --draw 4 --whole_length --length 50000
+```
+On each line there are two arrays. The first array is the origin (position in bp and time of firing in minute)
+The second one is the (position of the pause, duration of pauses)
+
 .. _pyscaffold-notes:
 
 Note
