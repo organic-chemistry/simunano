@@ -9,7 +9,9 @@ Description
 It can simulate either a single fork or a read with random origin.
 A Brdu experiment is modeled by a starting time and then a fork charactarised
 by its speed incorporate Brud with an increasing exponential during a pulse whose
-length can be adjusted, followed by a decreasing exponential
+length can be adjusted, followed by a decreasing exponential.
+
+The script to perform deconvolution is located in [Deconvolution](https://github.com/organic-chemistry/simunano/blob/main/notebooks/Extract_distribution.ipynb)
 
 
 Install
