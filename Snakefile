@@ -84,10 +84,11 @@ rule create_test_learning:
         shell(f"python src/simunano/simu_forks.py {params} --rfd --param data/meg3/params_res{round}.json --prefix {out}")
 
 nsim = config.get("nsim",1000)
+root_dir=config.get("root_dir","meg3_mock")
 
 rule create_test_learning_multi:
     output:
-        f"meg3_mock/learning_test.fa"
+        f"{root_dir}/learning_test.fa"
     params:
         standard=f"--n_conf {nsim} --time_per_mrt 1 --read_per_time 1 --no_mrt --multi --ground_truth --states" + common_params
     run:

@@ -27,7 +27,7 @@ Usage
 
 ```
 mkdir meg_mock3/
-snakemake --force create_test_learning_multi --config nsim=1000
+snakemake --force create_test_learning_multi --config nsim=1000 root_dir="meg_mock3/"
 ```
 
 
