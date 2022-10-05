@@ -17,9 +17,9 @@ The script to perform deconvolution is located in [Deconvolution](https://github
 Install
 ===========
 ```
-conda create --name simunano --file environment.yml
 git clone git@github.com:organic-chemistry/simunano.git
 cd simunano
+conda create --name simunano --file environment.yml
 ```
 
 Usage
