@@ -21,7 +21,7 @@ Require conda to be installed
 ```
 git clone https://github.com/organic-chemistry/simunano.git
 cd simunano
-conda create --name simunano --file environment.yml
+conda create --name simuNano --file environment.yml
 ```
 
 Usage
