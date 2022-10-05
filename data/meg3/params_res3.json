@@ -1,0 +1,19 @@
+{
+  "correlated": {
+    "file":"data/meg3/AllForks20211206params_start_15.pick",
+    "params":["inct","maxv","dect","minv"]
+    },
+  "pulselen": {
+      "params": [
+          2,
+          2
+      ],
+      "type": "uniform"
+  },
+
+  "speed": {
+      "params": "data/meg3/dataSMU100PLS_nt_20211025_speed_position_RTsc3_distribution_round2.json",
+      "type": "pomegranate"
+  }
+
+}

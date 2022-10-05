@@ -394,6 +394,10 @@ if __name__ == "__main__":
     parser.add_argument('--no_mrt', dest="mrt",action="store_false")
     parser.add_argument('--seed',  type=int,default=None)
     parser.add_argument('--correlation',action="store_true")
+    parser.add_argument('--rfd',action="store_true")
+    parser.add_argument('--zeros',action="store_true")
+    parser.add_argument('--states',action="store_true")
+
 
 
     args = parser.parse_args()
@@ -452,12 +456,14 @@ if __name__ == "__main__":
     mrts = {}
     starts={}
     ends={}
+    start_times = {}
     deltas=[]
 
     gt = {}
     parameters = {}
     all_speeds={}
     positions = {}
+    pulse_lens={}
     def draw(law):
         if law["type"] == "pomegranate":
             return GeneralMixtureModel.from_json(law["params"]).sample(1)
@@ -585,6 +591,7 @@ if __name__ == "__main__":
                                                    end=chlen,params=kw,pauses=pauses)
 
                 rfds = generate_rfd(sim,end=chlen)
+                start_time = i
             else:
 
                 time= np.arange(0,chlen/average_fork_speed,1/average_fork_speed)
@@ -592,9 +599,12 @@ if __name__ == "__main__":
                 start_mono=10000
                 tc,len_init,_ = track(time,start_time=time[start_mono//resolution-1],
                                     end_time=chlen/average_fork_speed,**kw)
-                rfds=None
+
+                start_time = time[start_mono//resolution-1]
                 kw["speed"]=len_init  / kw["pulselen"] * resolution
                 mrt=time
+                rfds = np.ones(len(tc))
+            pulselen = kw["pulselen"]
             #print(kw)
             for size in np.random.choice(possiblesize,p=distribsize,size=args.read_per_time):
 
@@ -616,6 +626,7 @@ if __name__ == "__main__":
                                      for li,[startf,endf] in zip(len_initial[0],
                                                                len_initial[1]) \
                                   if (li != 0) and startf>start and endf<start+size ]
+
 
                 ui = str(uuid.uuid4())
                 if args.ground_truth:
@@ -688,8 +699,10 @@ if __name__ == "__main__":
                 starts[ui]=starts
                 ends[ui]=ends
                 #pos[ui] = np.arange(start,start+size)
-                if args.mrt:
-                    mrts[ui]=np.array(np.concatenate(mrt),dtype=np.float16)
+                if args.mrt or args.zeros or args.states:
+                    mrts[ui]=np.array(np.concatenate(mrt)[start:start+size],dtype=np.float16)
+                    start_times[ui] = start_time
+
 
                 if args.one_fork:
                     positions[ui]=[start_mono//resolution,start_mono//resolution+len_init,1]
@@ -699,8 +712,10 @@ if __name__ == "__main__":
                     positions[ui]=[[startf-start,endf-start,(-1)**(posn+1)] for posn,(li,[startf,endf]) in enumerate(zip(len_initial[0],
                                                                len_initial[1])) \
                                   if (li != 0) and startf>start and endf<start+size ]
-                if not args.one_fork and rfds is not None:
-                    rfd[ui] = rfds[start:start+size]
+                #if not args.one_fork and rfds is not None:
+                rfd[ui] = rfds[start:start+size]
+                pulse_lens[ui] = pulselen
+
 
     k = list(fiber.keys())
     print(len(fiber.keys()),"len")
@@ -722,6 +737,38 @@ if __name__ == "__main__":
             for p in permuted:
                 formated = [str(v) for v in positions[p]]
                 h.writelines(f"{p}\n {str(positions[p])}\n")
+    if args.rfd:
+        with open(f"{args.prefix}_rfds.fa","w") as f:
+            for p in permuted:
+
+                formated = ["%i"%v  for v in rfd[p]]
+                f.writelines(f"{p}\n {' '.join(formated)}\n")
+
+    if args.zeros:
+        with open(f"{args.prefix}_zeros.fa","w") as f:
+            for p in permuted:
+                start_t = start_times[p]
+                formated = ["0" if v> start_t else "1"  for v in mrts[p]]
+                f.writelines(f"{p}\n {' '.join(formated)}\n")
+
+    if args.states:
+        with open(f"{args.prefix}_states.fa","w") as f:
+            for p in permuted:
+                start_t = start_times[p]
+                pulse_len = pulse_lens[p]
+                def which_state(mrt,rfd,start_t,pulse_len):
+                    if mrt < start_t:
+                        return "0"
+                    else:
+                        if start_t<mrt<start_t + pulse_len:
+                            return str(rfd)
+                        else:
+                            return str(2*rfd)
+
+
+
+                formated = [which_state(mrti,rfdi,start_t,pulse_len)  for mrti,rfdi in zip(mrts[p],rfd[p])]
+                f.writelines(f"{p}\n {' '.join(formated)}\n")
 
 
     with open(f"{args.prefix}.fa","w") as f, \
