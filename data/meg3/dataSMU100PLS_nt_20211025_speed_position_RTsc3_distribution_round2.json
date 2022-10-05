@@ -1,0 +1,67 @@
+{
+    "class" : "GeneralMixtureModel",
+    "distributions" : [
+        {
+            "class" : "Distribution",
+            "name" : "NormalDistribution",
+            "parameters" : [
+                2444.4611489407366,
+                122.73636137849118
+            ],
+            "frozen" : false
+        },
+        {
+            "class" : "Distribution",
+            "name" : "NormalDistribution",
+            "parameters" : [
+                2624.9616263651915,
+                93.8656511108113
+            ],
+            "frozen" : false
+        },
+        {
+            "class" : "Distribution",
+            "name" : "NormalDistribution",
+            "parameters" : [
+                553.3932573695438,
+                240.80692957799488
+            ],
+            "frozen" : false
+        },
+        {
+            "class" : "Distribution",
+            "name" : "NormalDistribution",
+            "parameters" : [
+                1728.7187017083006,
+                126.19584505222562
+            ],
+            "frozen" : false
+        },
+        {
+            "class" : "Distribution",
+            "name" : "NormalDistribution",
+            "parameters" : [
+                1190.4050403667034,
+                248.2241955752092
+            ],
+            "frozen" : false
+        },
+        {
+            "class" : "Distribution",
+            "name" : "NormalDistribution",
+            "parameters" : [
+                2132.7603110820587,
+                160.3198097367479
+            ],
+            "frozen" : false
+        }
+    ],
+    "weights" : [
+        0.44456903784391694,
+        0.18097986486869877,
+        0.043527039141747416,
+        0.08012282153322481,
+        0.08242960057972047,
+        0.16837163603269162
+    ]
+}
