@@ -29,10 +29,10 @@ Usage
 
 ```
 conda activate simunano
-mkdir meg_mock3/
 snakemake --force create_test_learning_multi --config nsim=1000 root_dir="meg_mock3/"
 ```
 
+or for more options and a longuer description
 
 ```
 python src/simunano/simu_forks.py --multi --n_conf 400 --time_per_mrt 2  --fork_position --resolution 100 --draw_sample 4
