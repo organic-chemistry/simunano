@@ -695,6 +695,7 @@ if __name__ == "__main__":
 
                 fiber[ui] = f
                 kw["speed_th"] = average_fork_speed * resolution
+                kw["resolution"] = resolution
                 parameters[ui] = kw
                 starts[ui]=starts
                 ends[ui]=ends
@@ -756,14 +757,18 @@ if __name__ == "__main__":
             for p in permuted:
                 start_t = start_times[p]
                 pulse_len = pulse_lens[p]
+                dect_p=parameters[p]["dect"] 
+                
                 def which_state(mrt,rfd,start_t,pulse_len):
                     if mrt < start_t:
                         return "0"
                     else:
-                        if start_t<mrt<start_t + pulse_len:
+                        if start_t<=mrt<start_t + pulse_len:
                             return str(rfd)
-                        else:
+                        elif start_t + pulse_len<=mrt<start_t + pulse_len+2.5*dect_p:
                             return str(2*rfd)
+                        else:
+                            return "3"
 
 
 
