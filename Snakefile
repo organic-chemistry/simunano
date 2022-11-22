@@ -13,7 +13,7 @@ rule create_meg_3_res1_for_deconv:
   output:
     [output_rep+f"meg3_mock/multi_{i}_round_{round}.fa" for i in range(5,9)]
   params:
-    standard="--multi --n_conf 1000 --time_per_mrt 5 --read_per_time 4 --no_mrt" + common_params
+    standard="--simu_type multi --n_conf 1000 --time_per_mrt 5 --read_per_time 4 --no_mrt" + common_params
   run:
     for i in range(len(output)):
       out =output[i].replace(".fa","")
@@ -47,7 +47,7 @@ rule create_meg_3_res1_from_deconvolved_multi:
     [f"{output_rep}/meg3_mock/multi_full_{i}.fa" for i in range(5)]
   params:
   #1650
-    standard="--multi --n_conf 1000 --time_per_mrt 5 --read_per_time 4  --fork_position --resolution 1 --draw_sample 20 --bckg meg3_res1 --no_mrt --ground_truth"
+    standard="--simu_type multi --n_conf 1000 --time_per_mrt 5 --read_per_time 4  --fork_position --resolution 1 --draw_sample 20 --bckg meg3_res1 --no_mrt --ground_truth"
   run:
     for i in range(len(output)):
        out =output[i].replace(".fa","")
@@ -57,7 +57,7 @@ rule create_meg_3_res1_from_deconvolved_multi_test:
   output:
     [output_rep+f"meg3_mock/multi_{i}_round_{round}_deconvolved.fa" for i in range(5)]
   params:
-    standard="--multi --n_conf 1000 --time_per_mrt 5 --read_per_time 4 --no_mrt" + common_params + " --ground_truth"
+    standard="--simu_type multi --n_conf 1000 --time_per_mrt 5 --read_per_time 4 --no_mrt" + common_params + " --ground_truth"
   run:
     for i in range(len(output)):
        out =output[i].replace(".fa","")
@@ -90,7 +90,18 @@ rule create_test_learning_multi:
     output:
         f"{root_dir}/learning_test.fa"
     params:
-        standard=f"--n_conf {nsim} --time_per_mrt 1 --read_per_time 1 --no_mrt --multi --ground_truth --states" + common_params
+        standard=f"--n_conf {nsim} --time_per_mrt 1 --read_per_time 1 --no_mrt --simu_type multi --ground_truth --states" + common_params
     run:
         out =f"{output}".replace(".fa","")
         shell(f"python src/simunano/simu_forks.py {params} --rfd --param data/meg3/params_res{round}.json --prefix {out}")
+
+
+rule create_test_simplified:
+    output:
+        f"{root_dir}/simplified_test.fa"
+    params:
+        standard=f"--n_conf {nsim} --time_per_mrt 1 --read_per_time 1 --no_mrt --simu_type simplified --ground_truth --states"\
+                  " --fork_position --resolution 1 --draw_sample 20 --bckg meg3_res1 --average_distance_between_ori 100000"
+    run:
+        out =f"{output}".replace(".fa","")
+        shell(f"python src/simunano/simu_forks.py {params} --rfd --param data/meg3/params_avg_simplified.json --prefix {out}")

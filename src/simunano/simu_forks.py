@@ -368,7 +368,6 @@ if __name__ == "__main__":
     parser.add_argument('--parameter_file', type=str,default='data/params.json')
 
     parser.add_argument('--average_distance_between_ori', type=float, default=50000)
-    parser.add_argument('--multi',dest="one_fork", action="store_false")
     parser.add_argument('--correct_for_height', action="store_true")
     parser.add_argument('--ground_truth',  action="store_true")
     parser.add_argument('--fork_position',  action="store_true",
@@ -376,6 +375,8 @@ if __name__ == "__main__":
 
     parser.add_argument('--resolution', type=int, default=100,
                         help="resolution in bp of the simulation")
+    parser.add_argument('--chlen', type=int, default=300000,
+                        help="maximum size of chromosome (bp)")
     parser.add_argument('--n_conf_ori', type=int, default=400,
                         help="Generate set of ori and firing times")
     parser.add_argument('--time_per_mrt', type=int, default=400,
@@ -397,6 +398,8 @@ if __name__ == "__main__":
     parser.add_argument('--rfd',action="store_true")
     parser.add_argument('--zeros',action="store_true")
     parser.add_argument('--states',action="store_true")
+    parser.add_argument('--simu_type',default=["multi"],choices=["multi","one_fork","simplified"])
+
 
 
 
@@ -417,6 +420,8 @@ if __name__ == "__main__":
     # inct : [.25,1.25], # lowest highest value ofcharacteristic time of the increasing exponential
     # dect : [2.,5]
 
+    simu_type = args.simu_type
+
     #############################################
 
     #Either create ori at specific position and firing time
@@ -428,26 +433,38 @@ if __name__ == "__main__":
     #Choose fiber size and distributions
     resolution = args.resolution
 
-    if not args.one_fork:
-        chlen=300000 // resolution
+    if simu_type != "one_fork":
+        chlen=args.chlen // resolution
         whole_length=False
 
     else:
         chlen = 50000 // resolution
         whole_length=True
 
-    if args.test:
+    if simu_type == "test":
         chlen=50000 //resolution
         whole_length=True
+
+    scaling = 15
+    if simu_type == "simplified":
+        scaling=100
+
 
     if args.whole_length:
         whole_length=True
     if args.length != None:
         chlen=int(args.length/resolution)
 
+
+
     possiblesize = np.arange(5000//resolution,chlen)
     distribsize = stats.lognorm(0.5,scale=35000/resolution).pdf(possiblesize)
     distribsize /= np.sum(distribsize)
+
+    if simu_type == "simplified":
+        possiblesize = [chlen-1]
+        distribsize=[1]
+
 
     nfork = {}
     pos={}
@@ -464,7 +481,12 @@ if __name__ == "__main__":
     all_speeds={}
     positions = {}
     pulse_lens={}
+
+
+
     def draw(law):
+        if law["type"] == "constant":
+            return law["params"]
         if law["type"] == "pomegranate":
             return GeneralMixtureModel.from_json(law["params"]).sample(1)
         if law["type"] == "choices":
@@ -530,43 +552,44 @@ if __name__ == "__main__":
         if average_fork_speed<=0:
             continue
         pauses=[]
-        if not args.one_fork:
+        #print(simu_type)
+        if simu_type == "test":
+            sim=[origin(100,0,average_fork_speed,average_fork_speed)]
+            #pauses=[Pause(pos=49,duration=20),Pause(pos=120,duration=4)]
 
-            if args.test:
-                sim=[origin(100,0,average_fork_speed,average_fork_speed)]
-                #pauses=[Pause(pos=49,duration=20),Pause(pos=120,duration=4)]
+            sim=[origin(30,0,average_fork_speed,average_fork_speed),origin(150,0,average_fork_speed,average_fork_speed)]
+            pauses=[]
+            #pauses=[Pause(pos=140,duration=10)]
+            #pauses=[Pause(pos=0,duration=0),Pause(pos=140,duration=10),Pause(pos=180,duration=0)]
+            #pauses=[Pause(pos=140,duration=10)]
+            #pauses=[Pause(pos=0,duration=0),Pause(pos=120,duration=0.5),Pause(pos=180,duration=0)]
+            #pauses=[Pause(pos=0,duration=0),Pause(pos=80,duration=10),Pause(pos=180,duration=0)]
+            #pauses=[Pause(pos=0,duration=0),Pause(pos=80,duration=0.5),Pause(pos=180,duration=0)]
 
-                sim=[origin(30,0,average_fork_speed,average_fork_speed),origin(150,0,average_fork_speed,average_fork_speed)]
-                pauses=[]
-                #pauses=[Pause(pos=140,duration=10)]
-                #pauses=[Pause(pos=0,duration=0),Pause(pos=140,duration=10),Pause(pos=180,duration=0)]
-                #pauses=[Pause(pos=140,duration=10)]
-                #pauses=[Pause(pos=0,duration=0),Pause(pos=120,duration=0.5),Pause(pos=180,duration=0)]
-                #pauses=[Pause(pos=0,duration=0),Pause(pos=80,duration=10),Pause(pos=180,duration=0)]
-                #pauses=[Pause(pos=0,duration=0),Pause(pos=80,duration=0.5),Pause(pos=180,duration=0)]
+        elif simu_type in ["multi","simplified"]:
+            sim = create_possible_origins(int(chlen / (args.average_distance_between_ori / resolution)),1,
+                                  average_fork_speed,chlen,scaling=scaling*100/args.resolution)[0]
 
-
-            elif args.conf != None:
-                sim=Confs[sim_number]
-                pauses=Pauses[sim_number]
-                average_fork_speed = np.mean(np.concatenate([[ori.L_fork_speed,ori.R_fork_speed] for ori in ori_pos]))
+            if len(sim)>1:
+                #print(sim)
+                deltas.extend([ori2.pos-ori1.pos for ori1,ori2 in zip(sim[:-1],sim[1:])])
             else:
-                sim = create_possible_origins(int(chlen / (args.average_distance_between_ori / resolution)),1,
-                                      average_fork_speed,chlen,scaling=15*100/args.resolution)[0]
+                deltas.append(np.nan)
 
-                if len(sim)>1:
-                    #print(sim)
-                    deltas.extend([ori2.pos-ori1.pos for ori1,ori2 in zip(sim[:-1],sim[1:])])
-                else:
-                    deltas.append(np.nan)
+        elif simu_type =="one_fork":
+            sim=[origin(0,0,average_fork_speed,average_fork_speed)]
 
-            mrt = generate_mrt(sim,end=chlen)
-        # Draw time between the first 3/5 of the MRT
-            minn = min(mrt)
-            maxi = minn +  3* (max(mrt)-min(mrt)) / 5
-        else:
-            minn=0
-            maxi=10 #Not used
+        elif args.conf != None:
+            sim=Confs[sim_number]
+            pauses=Pauses[sim_number]
+            average_fork_speed = np.mean(np.concatenate([[ori.L_fork_speed,ori.R_fork_speed] for ori in ori_pos]))
+
+        mrt = generate_mrt(sim,end=chlen)
+    # Draw time between the first 3/5 of the MRT
+        minn = min(mrt)
+        maxi = minn +  3* (max(mrt)-min(mrt)) / 5
+        if simu_type == "simplified":
+            minn =maxi/2
 
         for i in np.random.randint(minn,maxi,args.time_per_mrt):
             kw={}
@@ -586,7 +609,7 @@ if __name__ == "__main__":
 
                 kw["maxv"] = kw["maxv"]/(1-np.exp(-2/kw["inct"]))
 
-            if not args.one_fork:
+            if simu_type != "one_fork":
                 tc,len_initial,kw,mrt = generate_track(sim,start_time=i,
                                                    end=chlen,params=kw,pauses=pauses)
 
@@ -620,7 +643,7 @@ if __name__ == "__main__":
                         if attemp > 100:
                             break
 
-                if not args.one_fork:
+                if simu_type != "one_fork":
                     # Get speeds of non nul forks
                     kw["speed"]=[li / kw["pulselen"] * resolution\
                                      for li,[startf,endf] in zip(len_initial[0],
@@ -700,11 +723,15 @@ if __name__ == "__main__":
                 ends[ui]=ends
                 #pos[ui] = np.arange(start,start+size)
                 if args.mrt or args.zeros or args.states:
-                    mrts[ui]=np.array(np.concatenate(mrt)[start:start+size],dtype=np.float16)
+                    #print(mrt)
+                    try:
+                        mrts[ui]=np.array(np.concatenate(mrt)[start:start+size],dtype=np.float16)
+                    except:
+                        mrts[ui]=np.array(mrt[start:start+size],dtype=np.float16)
                     start_times[ui] = start_time
 
 
-                if args.one_fork:
+                if simu_type=="one_fork":
                     positions[ui]=[start_mono//resolution,start_mono//resolution+len_init,1]
                     all_speeds[ui]=[kw["speed"]]
                 else:

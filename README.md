@@ -21,11 +21,26 @@ Require conda to be installed
 ```
 git clone https://github.com/organic-chemistry/simunano.git
 cd simunano
+```
+then
+```
 conda create --name simuNano --file environment.yml
+```
+or
+```
+conda create --name simuNano -c conda-forge -c bioconda  matplotlib pandas jupyterlab numpy pomegranate python=3.6    # snakemake r-essentials
+conda activate simuNano
+conda install pip
 ```
 
 Usage
 ===========
+
+```
+conda activate simunano
+
+python src/simunano/simu_forks.py --n_conf 10 --time_per_mrt 1 --read_per_time 1 --no_mrt --multi --ground_truth --states --fork_position --resolution 1 --draw_sample 20 --bckg meg3_res1 --correlation  --rfd --param data/meg3/params_res3.json --prefix test//learning_test
+```
 
 ```
 conda activate simunano
@@ -35,7 +50,7 @@ snakemake --force create_test_learning_multi --config nsim=1000 root_dir="meg_mo
 or for more options and a longuer description
 
 ```
-python src/simunano/simu_forks.py --multi --n_conf 400 --time_per_mrt 2  --fork_position --resolution 100 --draw_sample 4
+python src/simunano/simu_forks.py --simu_type multi --n_conf 400 --time_per_mrt 2  --fork_position --resolution 100 --draw_sample 4
 ```
 
 Two main modes are available switched by the parameter --multi .
@@ -69,7 +84,7 @@ Additionnaly it can output:
 
 it is also possible to run specific configuration specified in a file (se example ifli in example/conf.txt)
 ```
-python src/simunano/simu_forks.py --conf ./example/conf.txt --multi --time_per_mrt 2 --read_per_time 1 --draw 4 --whole_length --length 50000
+python src/simunano/simu_forks.py --conf ./example/conf.txt --simu_type multi --time_per_mrt 2 --read_per_time 1 --draw 4 --whole_length --length 50000
 ```
 On each line there are two arrays. The first array is the origin (position in bp and time of firing in minute)
 The second one is the (position of the pause, duration of pauses)
