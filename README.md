@@ -88,13 +88,13 @@ For experiment with pauses
 
 it is also possible to run specific configuration specified in a file (se example ifli in example/conf.txt)
 
-# at 1 bp resolution
+## at 1 bp resolution
 
 ```
 python src/simunano/simu_forks.py --conf ./example/conf.txt --simu_type multi --time_per_mrt 10 --read_per_time 1 --draw 20 --whole_length --length 100000 --correlation --bckg meg3_res1 --param data/meg3/params_res3_uni.json --prefix tmp/test --resolution 1
 ```
 
-# at 100 bp resolution
+## at 100 bp resolution
 ```
 python src/simunano/simu_forks.py --conf ./example/conf.txt --simu_type multi --time_per_mrt 10 --read_per_time 1 --draw 20 --whole_length --length 100000 --correlation --bckg meg3 --param data/meg3/params_res3_uni.json --prefix tmp/test --resolution 100
 ```
