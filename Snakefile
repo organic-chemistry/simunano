@@ -105,3 +105,17 @@ rule create_test_simplified:
     run:
         out =f"{output}".replace(".fa","")
         shell(f"python src/simunano/simu_forks.py {params} --rfd --param data/meg3/params_avg_simplified.json --prefix {out}")
+
+rule create_test_clara_speeds:
+    output:
+        [f"{root_dir}/tau1_variable/speed_v_{v}/test.fa" for v in ["1","1.5","2","2.5","3"]] + \
+        [f"{root_dir}/tau2_variable/speed_v_{v}/test.fa" for v in ["1","1.5","2","2.5","3"]]
+    params:
+        standard=f"--n_conf {nsim} --time_per_mrt 1 --read_per_time 1 --no_mrt --simu_type one_fork --ground_truth --states"\
+                  " --fork_position --resolution 1 --draw_sample 20 --bckg meg3_res1 "
+    run:
+        for tau in [1,2]:
+          for speed in ["1","1.5","2","2.5","3"]:
+              out =f"{root_dir}/tau{tau}_variable/speed_v_{speed}/test"
+              param = f"data/meg3/clara_speeds/params_res2_uni_tau{tau}_variable_all_fixed_v{speed}.json"
+              shell(f"python src/simunano/simu_forks.py {params} --rfd --param {param} --prefix {out}")

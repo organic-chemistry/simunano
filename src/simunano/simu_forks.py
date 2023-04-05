@@ -399,6 +399,11 @@ if __name__ == "__main__":
     parser.add_argument('--zeros',action="store_true")
     parser.add_argument('--states',action="store_true")
     parser.add_argument('--simu_type',default=["multi"],choices=["multi","one_fork","simplified"])
+    parser.add_argument('--add_pauses',nargs='+',default=[],type=float,
+                        help="Time in minutes the pause is drawn randomly on "
+                             "if one time is specified the chromosome and the time is random between 0 and 2x add_pauses"
+                             "if two times t1 and t2 are specified then is is randomly drawn between t1 an t2. Time unit in min")
+
 
 
 
@@ -455,7 +460,7 @@ if __name__ == "__main__":
     if args.length != None:
         chlen=int(args.length/resolution)
 
-
+    print(chlen,simu_type)
 
     possiblesize = np.arange(5000//resolution,chlen)
     distribsize = stats.lognorm(0.5,scale=35000/resolution).pdf(possiblesize)
@@ -488,6 +493,7 @@ if __name__ == "__main__":
         if law["type"] == "constant":
             return law["params"]
         if law["type"] == "pomegranate":
+            #print(law)
             return GeneralMixtureModel.from_json(law["params"]).sample(1)
         if law["type"] == "choices":
             return np.random.choices(law["params"])
@@ -553,7 +559,11 @@ if __name__ == "__main__":
             continue
         pauses=[]
         #print(simu_type)
-        if simu_type == "test":
+        if args.conf != None:
+            sim=Confs[sim_number]
+            pauses=Pauses[sim_number]
+            average_fork_speed = np.mean(np.concatenate([[ori.L_fork_speed,ori.R_fork_speed] for ori in ori_pos]))
+        elif simu_type == "test":
             sim=[origin(100,0,average_fork_speed,average_fork_speed)]
             #pauses=[Pause(pos=49,duration=20),Pause(pos=120,duration=4)]
 
@@ -576,13 +586,25 @@ if __name__ == "__main__":
             else:
                 deltas.append(np.nan)
 
+            if len(args.add_pauses) > 0:
+                if len(args.add_pauses) == 1:
+                    t_pause = 2*np.random.rand()*args.add_pauses[0]
+                elif len(args.add_pauses) == 2:
+                    t1,t2 = args.add_pauses
+                    if t2<t1:
+                        raise
+                    t_pause = t1+(t2-t1)*np.random.rand()
+                else:
+                    print("maximum two times can be specifieyd. See help")
+                    raise
+                print(t_pause)
+                pauses=[Pause(pos=np.random.randint(0,chlen-1),duration=t_pause)]
+
         elif simu_type =="one_fork":
             sim=[origin(0,0,average_fork_speed,average_fork_speed)]
 
-        elif args.conf != None:
-            sim=Confs[sim_number]
-            pauses=Pauses[sim_number]
-            average_fork_speed = np.mean(np.concatenate([[ori.L_fork_speed,ori.R_fork_speed] for ori in ori_pos]))
+        
+            
 
         mrt = generate_mrt(sim,end=chlen)
     # Draw time between the first 3/5 of the MRT
@@ -816,8 +838,8 @@ if __name__ == "__main__":
             formated = ["%.2f"%v for v in all_speeds[p]]
             j.writelines(f"{p}\n {' '.join(formated)}\n")
 
-
-
+    #print("MRT",args.mrt)
+    #print(mrts)
     if args.draw_sample != 0:
 
         maxi = min(args.draw_sample,len(k))
@@ -844,7 +866,8 @@ if __name__ == "__main__":
                 pylab.plot(np.arange(len(ftp))*resolution/1000,smooth(smooth(ftp,100),2500),label=parameters[ui]["maxv"])
 
             #pylab.plot(np.arange(len(ftp))/10,gt[ui],label=parameters[ui]["maxv"])
-            if not args.resolution==1 and ui in mrt:
+            if (not args.resolution==1) and ui in mrts:
+
                 pylab.plot(np.arange(len(mrt))*resolution/1000,mrt/max(mrt),label=parameters[ui]["maxv"])
 
             #plot(np.arange(len(ftp))/10,rfd[np.array(k)[kp][i]])

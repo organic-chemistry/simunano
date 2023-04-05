@@ -28,7 +28,7 @@ conda create --name simuNano --file environment.yml
 ```
 or
 ```
-conda create --name simuNano -c conda-forge -c bioconda  matplotlib pandas jupyterlab numpy pomegranate python=3.6    # snakemake r-essentials
+conda create --name simuNano -c conda-forge -c bioconda  matplotlib pandas jupyterlab numpy pomegranate python=3.6  snakemake # r-essentials
 conda activate simuNano
 conda install pip
 ```
@@ -82,12 +82,32 @@ Additionnaly it can output:
   * with **--draw_sample 20 ** it will create a pdf with 20 readn to inspect the outputs
 
 
+
+For experiment with pauses
+==========================
+
 it is also possible to run specific configuration specified in a file (se example ifli in example/conf.txt)
+
+# at 1 bp resolution
+
 ```
-python src/simunano/simu_forks.py --conf ./example/conf.txt --simu_type multi --time_per_mrt 2 --read_per_time 1 --draw 4 --whole_length --length 50000
+python src/simunano/simu_forks.py --conf ./example/conf.txt --simu_type multi --time_per_mrt 10 --read_per_time 1 --draw 20 --whole_length --length 100000 --correlation --bckg meg3_res1 --param data/meg3/params_res3_uni.json --prefix tmp/test --resolution 1
+```
+
+# at 100 bp resolution
+```
+python src/simunano/simu_forks.py --conf ./example/conf.txt --simu_type multi --time_per_mrt 10 --read_per_time 1 --draw 20 --whole_length --length 100000 --correlation --bckg meg3 --param data/meg3/params_res3_uni.json --prefix tmp/test --resolution 100
 ```
 On each line there are two arrays. The first array is the origin (position in bp and time of firing in minute)
 The second one is the (position of the pause, duration of pauses)
+
+
+Or to randomly draw pauses use the argument add_pauses which specify either only one time t and the time of pause will be between 0 and 2t or two times t1 and t2 and the time of pause will be between t1 and t2 :
+
+```
+python src/simunano/simu_forks.py  --simu_type multi --time_per_mrt 10 --read_per_time 1 --draw 20 --whole_length --length 100000 --correlation --bckg meg3 --param data/meg3/params_res3_uni.json --prefix tmp/test --resolution 100 --add_pauses 10 11 --n_conf 20
+```
+
 
 .. _pyscaffold-notes:
 
