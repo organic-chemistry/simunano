@@ -204,6 +204,7 @@ def generate_track(pos_time,start_time=10,end=1000,params={},same_parameters=Tru
 
 
     trac = np.zeros(end)
+    rfd = []
 
     x1,t1,L_fork_speed = pos_time[0].pos,pos_time[0].firing_time,pos_time[0].L_fork_speed
     time= np.arange(t1,t1+x1/L_fork_speed,1/L_fork_speed)
@@ -217,6 +218,7 @@ def generate_track(pos_time,start_time=10,end=1000,params={},same_parameters=Tru
 
     #print(len_init)
     mrt = [time[:x1][::-1]]
+    rfd = [[-1]*len(mrt[-1])]
     #mrt[:x1] = time[:x1][::-1]
     len_initial = [len_init + 0] #store the length of the increasing parts
     pos_s = [[x1-len_init-before,x1-before]]
@@ -268,6 +270,7 @@ def generate_track(pos_time,start_time=10,end=1000,params={},same_parameters=Tru
             time[pause.pos-p1.pos:] += pause.duration
 
         mrt.append(time[:size])
+        rfd.append([1]*len(mrt[-1]))
         #print(time)
         #print(time,len(time))
         #print(p1[0],p2[0],middle)
@@ -289,6 +292,8 @@ def generate_track(pos_time,start_time=10,end=1000,params={},same_parameters=Tru
 
 
         mrt.append(time[:size][::-1])
+        rfd.append([-1]*len(mrt[-1]))
+
         #print(time,len(time))
         trac[middle:p2.pos]
 
@@ -313,6 +318,8 @@ def generate_track(pos_time,start_time=10,end=1000,params={},same_parameters=Tru
         time[pauses[-1].pos-x2:]+=pauses[-1].duration
 
     mrt.append(time[:size])
+    rfd.append([1]*len(mrt[-1]))
+
     #mrt[x2:] = time[:size]
 
 
@@ -326,7 +333,12 @@ def generate_track(pos_time,start_time=10,end=1000,params={},same_parameters=Tru
         kw = list_param_generated
     #print(len(trac),len(np.concatenate(mrt)))
     #print(pauses,R_fork_speed)
-    return trac,[len_initial,pos_s],kw,mrt
+    if len(rfd)==1:
+        rfd=np.array(rfd[0])
+    else:
+        rfd=np.concatenate(rfd)
+
+    return trac,[len_initial,pos_s],kw,mrt,rfd
 
 
 def create_possible_origins(n_ori,n_sim,average_fork_speed,chlen,scaling=15):
@@ -549,6 +561,7 @@ if __name__ == "__main__":
     else:
         n_conf = args.n_conf_ori
 
+
     for sim_number  in range(n_conf): # [current]:
         if sim_number % 500 == 0:
             print(sim_number,sim_number/n_conf)
@@ -597,7 +610,7 @@ if __name__ == "__main__":
                 else:
                     print("maximum two times can be specifieyd. See help")
                     raise
-                print(t_pause)
+                #print(t_pause)
                 pauses=[Pause(pos=np.random.randint(0,chlen-1),duration=t_pause)]
 
         elif simu_type =="one_fork":
@@ -632,10 +645,13 @@ if __name__ == "__main__":
                 kw["maxv"] = kw["maxv"]/(1-np.exp(-2/kw["inct"]))
 
             if simu_type != "one_fork":
-                tc,len_initial,kw,mrt = generate_track(sim,start_time=i,
+                tc,len_initial,kw,mrt,rfds = generate_track(sim,start_time=i,
                                                    end=chlen,params=kw,pauses=pauses)
 
-                rfds = generate_rfd(sim,end=chlen)
+                #rfds = generate_rfd(sim,end=chlen)
+                if pauses != []:
+                    #print(pauses)
+                    kw["pauses"] = [[p.pos,p.duration] for p in pauses]
                 start_time = i
             else:
 
@@ -869,6 +885,8 @@ if __name__ == "__main__":
             if (not args.resolution==1) and ui in mrts:
 
                 pylab.plot(np.arange(len(mrt))*resolution/1000,mrt/max(mrt),label=parameters[ui]["maxv"])
+            if (not args.resolution==1) and ui in rfd:
+                pylab.plot(np.arange(len(rfd[ui]))*resolution/1000,rfd[ui],label=parameters[ui]["maxv"])
 
             #plot(np.arange(len(ftp))/10,rfd[np.array(k)[kp][i]])
             pylab.ylim(0,1.1)
