@@ -687,6 +687,10 @@ if __name__ == "__main__":
                                      for li,[startf,endf] in zip(len_initial[0],
                                                                len_initial[1]) \
                                   if (li != 0) and startf>start and endf<start+size ]
+                if pauses != []:
+                    kw["pauses"] = [[(p.pos-start)*resolution,p.duration] for p in pauses if size>p.pos-start>0]
+
+
 
 
                 ui = str(uuid.uuid4())
